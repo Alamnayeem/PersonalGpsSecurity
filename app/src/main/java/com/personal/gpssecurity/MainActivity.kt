@@ -10,6 +10,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.personal.gpssecurity.ui.theme.PersonalGpsSecurityTheme
 import com.personal.gpssecurity.ui.screens.DashboardScreen
@@ -17,6 +20,7 @@ import com.personal.gpssecurity.ui.screens.DashboardScreen
 class MainActivity : ComponentActivity() {
 
     private val prefs by lazy { getSharedPreferences("gps_security_prefs", Context.MODE_PRIVATE) }
+    private var isTrackingActiveState by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -38,13 +42,23 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkAndRequestPermissions()
 
+        isTrackingActiveState = isServiceRunning()
+
+        var deviceId = prefs.getString("device_id", "") ?: ""
+        if (deviceId.isEmpty()) {
+            val randNum = (1000..9999).random()
+            deviceId = "SENTINEL-$randNum"
+            prefs.edit().putString("device_id", deviceId).apply()
+        }
+
         setContent {
             PersonalGpsSecurityTheme {
                 DashboardScreen(
+                    deviceId = deviceId,
                     onToggleTracking = { active ->
                         toggleTrackingService(active)
                     },
-                    isTrackingActive = isServiceRunning()
+                    isTrackingActive = isTrackingActiveState
                 )
             }
         }
@@ -83,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
     private fun toggleTrackingService(enable: Boolean) {
         prefs.edit().putBoolean("is_tracking_active", enable).apply()
+        isTrackingActiveState = enable
         val intent = Intent(this, TrackingService::class.java)
         if (enable) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
