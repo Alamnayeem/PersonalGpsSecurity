@@ -14,7 +14,6 @@ class ChargingApplication : Application() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            const val CHANNEL_ID = "charging_overlay_channel"
             val name = "Charging Overlay Service"
             val descriptionText = "Displays floating overlay animation during battery charging"
             val importance = NotificationManager.IMPORTANCE_LOW
