@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
 import android.os.Build
+import android.widget.Toast
 import com.charging.animation.pro.model.BatteryHealth
 import com.charging.animation.pro.model.BatteryInfo
 import com.charging.animation.pro.model.ChargingType
@@ -20,10 +21,12 @@ class BatteryReceiver(
         when (action) {
             Intent.ACTION_POWER_CONNECTED -> {
                 val batteryInfo = extractBatteryInfo(intent, context)
+                Toast.makeText(context, "⚡ Charger Connected! Launching Overlay...", Toast.LENGTH_SHORT).show()
                 ChargingOverlayService.startOverlay(context, batteryInfo)
                 onBatteryChanged?.invoke(batteryInfo)
             }
             Intent.ACTION_POWER_DISCONNECTED -> {
+                Toast.makeText(context, "🔋 Charger Disconnected", Toast.LENGTH_SHORT).show()
                 ChargingOverlayService.stopOverlay(context)
                 val batteryInfo = extractBatteryInfo(intent, context)
                 onBatteryChanged?.invoke(batteryInfo)
@@ -69,7 +72,6 @@ class BatteryReceiver(
                 else -> BatteryHealth.UNSPECIFIED
             }
 
-            // Estimate charging remaining minutes intelligently
             val remainingCapacity = 100 - percentage
             val estimatedMinutes = if (isCharging && remainingCapacity > 0) {
                 when (chargingType) {

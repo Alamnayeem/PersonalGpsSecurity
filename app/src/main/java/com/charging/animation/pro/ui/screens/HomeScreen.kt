@@ -112,6 +112,117 @@ fun HomeScreen(
             }
         }
 
+        // Test Animation Action Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF131B2E)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "⚡ Test Charging Animation Overlay",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "Test the floating island charging animation right now without plugging in your charger cable.",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Button(
+                        onClick = {
+                            com.charging.animation.pro.service.ChargingOverlayService.startOverlay(context, batteryInfo)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color.Black)
+                    ) {
+                        Text("⚡ Test Overlay", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            com.charging.animation.pro.service.ChargingOverlayService.stopOverlay(context)
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Text("Stop")
+                    }
+                }
+            }
+        }
+
+        // Phone Setup Guide Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "📱 Phone Setup Guide (কেন অ্যানিমেশন আসছে না?)",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00E5FF)
+                )
+                Text(
+                    text = "1. Turn on 'Display over other apps' (ডিসপ্লে ওভার আদার অ্যাপস পারমিশন এলাউ করুন)।
+2. Turn on 'Autostart' & set Battery Saver to 'No Restrictions' (Xiaomi/Realme/Oppo/Vivo/Samsung এ অটোস্টার্ট ও ব্যাকগ্রাউন্ড পারমিশন অন করুন)।",
+                    fontSize = 12.sp,
+                    color = Color.LightGray,
+                    lineHeight = 18.sp
+                )
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("1. Overlay Permission", fontSize = 11.sp, color = Color(0xFF00E5FF))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("2. App Settings", fontSize = 11.sp, color = Color.White)
+                    }
+                }
+            }
+        }
+
         // Diagnostics Grid
         Text(
             text = "BATTERY DIAGNOSTICS",

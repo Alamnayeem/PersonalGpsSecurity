@@ -6,16 +6,16 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
-import androidx.compose.animation.AnimatedVisibility
+import android.widget.Toast
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -24,9 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
@@ -34,15 +32,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.charging.animation.pro.ChargingApplication
-import com.charging.animation.pro.R
 import com.charging.animation.pro.model.BatteryInfo
 import com.charging.animation.pro.model.ChargingType
 
-class ChargingOverlayService : Service() {
+class ChargingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+    private val store = ViewModelStore()
+
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+    override val viewModelStore: ViewModelStore get() = store
 
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
@@ -53,6 +66,8 @@ class ChargingOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, createNotification())
     }
@@ -64,7 +79,7 @@ class ChargingOverlayService : Service() {
                     val info = extractBatteryInfoFromIntent(it)
                     batteryInfoState.value = info
                     showOverlayWindow()
-                    scheduleAutoHide(8000)
+                    scheduleAutoHide(10000)
                 }
                 ACTION_UPDATE -> {
                     batteryInfoState.value = extractBatteryInfoFromIntent(it)
@@ -80,6 +95,23 @@ class ChargingOverlayService : Service() {
 
     private fun showOverlayWindow() {
         if (overlayView != null) return
+
+        // Check overlay permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "⚠️ Please allow 'Display over other apps' permission to show charging animation!", Toast.LENGTH_LONG).show()
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                ).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            return
+        }
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -102,6 +134,9 @@ class ChargingOverlayService : Service() {
         }
 
         overlayView = ComposeView(this).apply {
+            setViewTreeLifecycleOwner(this@ChargingOverlayService)
+            setViewTreeViewModelStoreOwner(this@ChargingOverlayService)
+            setViewTreeSavedStateRegistryOwner(this@ChargingOverlayService)
             setContent {
                 FloatingChargingIsland(batteryInfo = batteryInfoState.value)
             }
@@ -111,6 +146,7 @@ class ChargingOverlayService : Service() {
             windowManager?.addView(overlayView, params)
         } catch (e: Exception) {
             e.printStackTrace()
+            Toast.makeText(this, "Could not draw overlay: " + e.localizedMessage, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -135,8 +171,8 @@ class ChargingOverlayService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, ChargingApplication.CHANNEL_ID)
-            .setContentTitle("Charging Animation Active")
-            .setContentText("Displaying floating charging overlay")
+            .setContentTitle("Charging Animation Active ⚡")
+            .setContentText("Listening for charger connection & showing floating island")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -144,10 +180,10 @@ class ChargingOverlayService : Service() {
     }
 
     private fun extractBatteryInfoFromIntent(intent: Intent): BatteryInfo {
-        val pct = intent.getIntExtra(EXTRA_PERCENTAGE, 0)
+        val pct = intent.getIntExtra(EXTRA_PERCENTAGE, 50)
         val isCharging = intent.getBooleanExtra(EXTRA_IS_CHARGING, true)
-        val temp = intent.getFloatExtra(EXTRA_TEMP, 32.0f)
-        val volt = intent.getIntExtra(EXTRA_VOLT, 4100)
+        val temp = intent.getFloatExtra(EXTRA_TEMP, 33.5f)
+        val volt = intent.getIntExtra(EXTRA_VOLT, 4150)
         return BatteryInfo(
             percentage = pct,
             isCharging = isCharging,
@@ -159,6 +195,8 @@ class ChargingOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        store.clear()
         removeOverlayWindow()
         super.onDestroy()
     }
